@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Working Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #4299e1; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #3182ce; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow: auto; }
+        .success { color: green; }
+        .error { color: red; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.online { background: #c6f6d5; color: #22543d; }
+        .status.offline { background: #fed7d7; color: #742a2a; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>✅ Тест CORS и API</h1>
+    
+    <div id="serverStatus" class="status">🔄 Проверка сервера...</div>
+    
+    <div style="margin: 20px 0;">
+        <h3>📝 Тестовые данные:</h3>
+        <input type="email" id="email" placeholder="Email" value="test@test.com">
+        <input type="text" id="name" placeholder="Full Name" value="Test User">
+        <input type="password" id="password" placeholder="Password" value="123456">
+        <select id="role">
+            <option value="student">Студент</option>
+            <option value="teacher">Преподаватель</option>
+        </select>
+    </div>
+
+    <div>
+        <button onclick="testHealth()">🏥 Проверить Health</button>
+        <button onclick="testRegister()">📝 Тест регистрации</button>
+        <button onclick="testLogin()">🔑 Тест входа</button>
+        <button onclick="testOptions()">🔄 Тест OPTIONS</button>
+        <button onclick="testCORSHeaders()">📋 Показать CORS заголовки</button>
+    </div>
+
+    <div id="result" style="margin-top: 20px;"></div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const resultDiv = document.getElementById('result');
+
+        // Проверка сервера при загрузке
+        window.onload = async function() {
+            await testHealth();
+        };
+
+        async function testHealth() {
+            const statusDiv = document.getElementById('serverStatus');
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    statusDiv.innerHTML = '✅ Сервер работает!';
+                    statusDiv.className = 'status online';
+                } else {
+                    statusDiv.innerHTML = '❌ Сервер не отвечает';
+                    statusDiv.className = 'status offline';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Ошибка подключения: ${error.message}`;
+                statusDiv.className = 'status offline';
+            }
+        }
+
+        async function testOptions() {
+            resultDiv.innerHTML = '<pre>🔄 Выполняется OPTIONS запрос...</pre>';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type'
+                    }
+                });
+                
+                let result = '✅ OPTIONS запрос выполнен\n';
+                result += `Статус: ${response.status}\n\n`;
+                result += '📋 ЗАГОЛОВКИ ОТВЕТА:\n';
+                
+                response.headers.forEach((value, key) => {
+                    result += `  ${key}: ${value}\n`;
+                });
+                
+                resultDiv.innerHTML = `<pre class="success">${result}</pre>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">❌ Ошибка: ${error.message}</pre>`;
+            }
+        }
+
+        async function testCORSHeaders() {
+            resultDiv.innerHTML = '<pre>🔄 Проверка CORS заголовков...</pre>';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST'
+                    }
+                });
+                
+                let result = '📋 CORS ЗАГОЛОВКИ:\n\n';
+                const corsHeaders = [];
+                
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().includes('access-control')) {
+                        result += `  ${key}: ${value}\n`;
+                        corsHeaders.push(`${key}: ${value}`);
+                    }
+                });
+                
+                if (corsHeaders.length === 0) {
+                    result += '  ❌ Заголовки CORS отсутствуют!\n';
+                } else {
+                    result += '\n✅ CORS настроен правильно\n';
+                }
+                
+                resultDiv.innerHTML = `<pre>${result}</pre>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">❌ Ошибка: ${error.message}</pre>`;
+            }
+        }
+
+        async function testRegister() {
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            
+            resultDiv.innerHTML = '<pre>🔄 Регистрация...</pre>';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        full_name: name,
+                        password: password,
+                        role: role
+                    })
+                });
+                
+                const data = await response.json();
+                
+                let result = `📊 Статус: ${response.status}\n\n`;
+                result += `📦 Ответ: ${JSON.stringify(data, null, 2)}\n\n`;
+                
+                if (response.ok) {
+                    result += '✅ Регистрация успешна!\n';
+                    result += `🔑 Токен: ${data.access_token.substring(0, 30)}...\n`;
+                } else {
+                    result += `❌ Ошибка: ${data.detail || 'Неизвестная ошибка'}\n`;
+                }
+                
+                resultDiv.innerHTML = `<pre>${result}</pre>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">❌ Ошибка: ${error.message}</pre>`;
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            resultDiv.innerHTML = '<pre>🔄 Вход...</pre>';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                let result = `📊 Статус: ${response.status}\n\n`;
+                result += `📦 Ответ: ${JSON.stringify(data, null, 2)}\n\n`;
+                
+                if (response.ok) {
+                    result += '✅ Вход успешен!\n';
+                    result += `🔑 Токен: ${data.access_token.substring(0, 30)}...\n`;
+                } else {
+                    result += `❌ Ошибка: ${data.detail || 'Неверный email или пароль'}\n`;
+                }
+                
+                resultDiv.innerHTML = `<pre>${result}</pre>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<pre class="error">❌ Ошибка: ${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
